@@ -1,4 +1,3 @@
----
 name: .NET CI (trx -> junit)
 
 on:
@@ -16,15 +15,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repo
+        uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v5
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '9.0.x'
 
-      - run: dotnet restore src/Presentation/Nop.Web/Nop.Web.csproj
+      - name: Restore
+        run: dotnet restore src/Presentation/Nop.Web/Nop.Web.csproj
 
-      - run: dotnet build --configuration Debug src/Presentation/Nop.Web/Nop.Web.csproj
+      - name: Build
+        run: dotnet build --configuration Debug src/Presentation/Nop.Web/Nop.Web.csproj
 
       - name: Run tests (produce TRX)
         run: |
@@ -34,24 +37,21 @@ jobs:
             --no-build
 
       - name: Install trx2junit
-        run: dotnet tool install --global trx2junit --version 1.2.0
-
-      - name: Add dotnet tools to PATH
-        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
-
-      - name: Verify installation & results exist
-        run: |
-          dotnet tool list -g
-          ls -la TestResults
-          which trx2junit
+        run: dotnet tool install --global trx2junit
 
       - name: Convert TRX to JUnit
-        run: trx2junit TestResults/TestResults.trx -o TestResults/TESTS-Nop.Tests.xml
+        env:
+          PATH: ${{ env.PATH }}:${{ github.workspace }}/.dotnet/tools:$HOME/.dotnet/tools
+        run: |
+          # convert TRX -> JUnit
+          trx2junit TestResults/TestResults.trx -o TestResults/TESTS-Nop.Tests.xml
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload JUnit report
+        uses: actions/upload-artifact@v4
         with:
           name: junit-reports
           path: TestResults/TESTS-*.xml
 
-
-
+      - name: Publish app
+        # if: success()
+        run: dotnet publish --configuration Release src/Presentation/Nop.Web/Nop.Web.csproj --output published
